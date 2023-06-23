@@ -15,6 +15,12 @@ struct Node<NodeElement, EdgeElement> {
 }
 
 impl<NodeElement, EdgeElement> Node<NodeElement, EdgeElement> {
+    pub fn new(element: NodeElement) -> Self {
+        Node {
+            element,
+            edges: vec![],
+        }
+    }
     pub fn insert_edge(mut self, edge: Edge<NodeElement, EdgeElement>) {
         self.edges.push(edge);
     }
@@ -23,14 +29,14 @@ impl<NodeElement, EdgeElement> Node<NodeElement, EdgeElement> {
 /// Represents an edge between nodes in a single direction.
 struct Edge<NodeElement, EdgeElement> {
     element: EdgeElement,
-    destination: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
+    destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
 }
 
-impl<NodeElement, EdgeElement> Node<NodeElement, EdgeElement> {
-    pub fn new(element: NodeElement) -> Self {
-        Node {
+impl<NodeElement, EdgeElement> Edge<NodeElement, EdgeElement> {
+    pub fn new(element: EdgeElement, destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>) -> Self {
+        Edge {
+            destination_node: destination_node.clone(),
             element,
-            edges: vec![],
         }
     }
 }
@@ -91,8 +97,8 @@ Current Location:
 1. Update description.
 2. Connect new location.
 3. Enter interactive mode
-X. Exit"#);
-    return prompt_with_options(PROMPT, vec!["1", "2", "3", "X"]);
+x. Exit"#);
+    return prompt_with_options(PROMPT, vec!["1", "2", "3", "x"]);
 }
 
 fn update_location_description(graph: &mut StringGraph) {
@@ -105,7 +111,31 @@ fn update_location_description(graph: &mut StringGraph) {
 }
 
 fn connect_new_location(graph: &mut StringGraph) {
+    let mut new_location =
+        Rc::new(RefCell::new(StringNode::new(prompt("Enter the description for teh new location:"))));
+    let new_direction = prompt("Enter the direction that will take you to the new location:");
+    {
+        let mut current_node = &graph.current_node;
+        let mut borrowed_node = current_node.borrow_mut();
+        let to_edge = StringEdge::new(new_direction, new_location.clone());
+        // TODO: Why doesn't insert_edge work here? It says a move is occurring, but I don't understand.
+        // graph.current_node.borrow().insert_edge(StringEdge::new(new_direction, new_location));
+        borrowed_node.edges.push(to_edge);
 
+        loop {
+            match (prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str()) {
+                "y" | "Y" => {
+                    let mut return_direction = prompt("Enter the return direction that will take you back:");
+                    new_location.borrow_mut().edges.push(StringEdge::new(return_direction, new_location.clone()));
+                    break;
+                }
+                "n" | "Y" => break,
+                _ => (),
+            }
+        }
+    }
+
+    graph.current_node = new_location.clone();
 }
 
 fn interactive_mode(graph: &mut StringGraph) {
@@ -120,33 +150,8 @@ fn main() {
             "1" => update_location_description(&mut graph),
             "2" => connect_new_location(&mut graph),
             "3" => (),
-            "X" => break,
+            "X" | "x" => break,
             _ => ()
         }
     }
-
-
-    // let mut destinationNdoe: StringNode = Node {
-    //     edges: vec![],
-    //     element: "The next place".to_string(),
-    // };
-    // let mut edge: Edge<String, String> = Edge {
-    //     destination: destinationNdoe,
-    //     element: "direction".to_string(),
-    // };
-    // let mut node: Node<String, String> = Node {
-    //     edges: vec![
-    //         edge,
-    //     ],
-    //     element: "You are in a dark room. It smells damp and musty. All you can see is a small amount of light outlining what appears to be a door several feet away.".to_string(),
-    // };
-    // println!("{}", node.element);
-    // Actions:
-    // * Open door: let's more light into the room, exposing a small light switch next to the door.
-    // * Turn on switch (only available once the door is opened, "You can't see a light switch" otherwise):
-
-    // let followedEdge = &node.edges[0];
-    // println!("Direction: {}", followedEdge.element);
-    // println!("Ne Node: {}", followedEdge.destination.element);
-    // println!("Input: {}", prompt(">"));
 }
