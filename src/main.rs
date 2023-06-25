@@ -14,15 +14,22 @@ struct Node<NodeElement, EdgeElement> {
     edges: Vec<Edge<NodeElement, EdgeElement>>
 }
 
-impl<NodeElement, EdgeElement> Node<NodeElement, EdgeElement> {
+impl<NodeElement, EdgeElement: PartialEq> Node<NodeElement, EdgeElement> {
     pub fn new(element: NodeElement) -> Self {
         Node {
             element,
             edges: vec![],
         }
     }
+
     pub fn insert_edge(mut self, edge: Edge<NodeElement, EdgeElement>) {
         self.edges.push(edge);
+    }
+
+    pub fn node_for_edge_element(&self, element: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {
+        self.edges.iter()
+            .find(|item| item.element == element)
+            .map(|item| item.destination_node.clone())
     }
 }
 
@@ -32,12 +39,16 @@ struct Edge<NodeElement, EdgeElement> {
     destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
 }
 
-impl<NodeElement, EdgeElement> Edge<NodeElement, EdgeElement> {
+impl<NodeElement, EdgeElement: PartialEq> Edge<NodeElement, EdgeElement> {
     pub fn new(element: EdgeElement, destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>) -> Self {
         Edge {
             destination_node: destination_node.clone(),
             element,
         }
+    }
+
+    pub fn matches(self, element: EdgeElement) -> bool {
+        self.element == element
     }
 }
 
@@ -46,13 +57,35 @@ struct Graph<NodeElement, EdgeElement> {
     current_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
 }
 
-impl<NodeElement, EdgeElement> Graph<NodeElement, EdgeElement> {
+impl<NodeElement, EdgeElement: PartialEq> Graph<NodeElement, EdgeElement> {
 
     pub fn new(root_node: Node<NodeElement, EdgeElement>) -> Self {
         let root_node_ptr = Rc::new(RefCell::new(root_node));
         Graph {
             root_node: root_node_ptr.clone(),
             current_node: root_node_ptr.clone(),
+        }
+    }
+
+    pub fn traverse(&mut self, edge: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {
+        // The first block needs to borrow the current node to try and find a match. Once the block
+        // goes out of scope, the borrow ends and the second block is responsible for assigning the
+        // matched node as the current node. Without the separate blocks, the compiler complains
+        // about self.current already being borrowed when trying to assign to it.
+        match {
+            let current_node = self.current_node.borrow();
+            match current_node.node_for_edge_element(edge) {
+                Some(matched_node) => {
+                    Some(matched_node.clone())
+                },
+                None => None
+            }
+        } {
+            Some(matched_node) => {
+                self.current_node = matched_node.clone();
+                Some(matched_node.clone())
+            },
+            None => None
         }
     }
 
@@ -83,7 +116,7 @@ type StringNode = Node<String, String>;
 type StringEdge = Edge<String, String>;
 type StringGraph = Graph<String, String>;
 
-fn location_edit_menu(graph: &StringGraph) -> String {
+fn print_current_location(graph: &StringGraph) {
     // Borrowing example
     // https://www.reddit.com/r/rust/comments/6q4uqc/help_whats_the_best_way_to_join_an_iterator_of/
     let location = &graph.current_node.borrow();
@@ -92,13 +125,18 @@ fn location_edit_menu(graph: &StringGraph) -> String {
 Current Location:
     Description: {}
     Possible Directions: {}"#
-             , location.element, ""); //possible_directions);
+             , location.element, possible_directions);
+}
+
+fn location_edit_menu(graph: &StringGraph) -> String {
+    print_current_location(graph);
     println!(r#"
 1. Update description.
 2. Connect new location.
-3. Enter interactive mode
+3. Move
+4. Enter interactive mode
 x. Exit"#);
-    return prompt_with_options(PROMPT, vec!["1", "2", "3", "x"]);
+    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "x"]);
 }
 
 fn update_location_description(graph: &mut StringGraph) {
@@ -112,7 +150,7 @@ fn update_location_description(graph: &mut StringGraph) {
 
 fn connect_new_location(graph: &mut StringGraph) {
     let mut new_location =
-        Rc::new(RefCell::new(StringNode::new(prompt("Enter the description for teh new location:"))));
+        Rc::new(RefCell::new(StringNode::new(prompt("Enter the description for the new location:"))));
     let new_direction = prompt("Enter the direction that will take you to the new location:");
     {
         let mut current_node = &graph.current_node;
@@ -126,7 +164,7 @@ fn connect_new_location(graph: &mut StringGraph) {
             match (prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str()) {
                 "y" | "Y" => {
                     let mut return_direction = prompt("Enter the return direction that will take you back:");
-                    new_location.borrow_mut().edges.push(StringEdge::new(return_direction, new_location.clone()));
+                    new_location.borrow_mut().edges.push(StringEdge::new(return_direction, current_node.clone()));
                     break;
                 }
                 "n" | "Y" => break,
@@ -135,21 +173,53 @@ fn connect_new_location(graph: &mut StringGraph) {
         }
     }
 
+    // TODO: Change this to use Graph::traverse instead.
     graph.current_node = new_location.clone();
 }
 
-fn interactive_mode(graph: &mut StringGraph) {
+fn move_to_location(graph: &mut StringGraph) -> bool {
+    loop {
+        let desired_direction = prompt("Which way do you want to go? ");
+        if desired_direction == "X".to_string() {
+            return false;
+        }
 
+        // TODO: If there aren't any valid directions, immediately exit.
+        // TODO: If there's only one direction, just use it.
+        match graph.traverse(desired_direction) {
+            Some(_) => return true,
+            None => println!("That's not a valid direction. Give it another go...")
+        }
+    }
+}
+
+fn interactive_mode(graph: &mut StringGraph) {
+    loop {
+        print_current_location(graph);
+        // TODO: Keep asking for a direction to go until a valid one is chosen.
+        // TODO: Encapsulate this into a function.
+        if !move_to_location(graph) {
+            break;
+        }
+    }
 }
 
 fn main() {
     let mut graph = StringGraph::new(StringNode::new(prompt("Enter the description of your first node:")));
 
+    // TODO: Add default data.
+
     loop {
         match location_edit_menu(&graph).as_str() {
             "1" => update_location_description(&mut graph),
             "2" => connect_new_location(&mut graph),
-            "3" => (),
+            // TODO: Connect existing location
+            // Will need to navivate to it somehow, unless referring by some id?
+            "3" => {
+                move_to_location(&mut graph);
+                ()
+            },
+            "4" => interactive_mode(&mut graph),
             "X" | "x" => break,
             _ => ()
         }
