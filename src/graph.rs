@@ -3,15 +3,20 @@ use std::rc::Rc;
 
 pub struct Node<NodeElement, EdgeElement> {
     pub element: NodeElement,
-    pub edges: Vec<Edge<NodeElement, EdgeElement>>,
+    edges: Vec<Edge<NodeElement, EdgeElement>>,
+
 }
 
-impl<NodeElement, EdgeElement: PartialEq> Node<NodeElement, EdgeElement> {
+impl<NodeElement, EdgeElement: PartialEq + Clone> Node<NodeElement, EdgeElement> {
     pub fn new(element: NodeElement) -> Self {
         Node {
             element,
             edges: vec![],
         }
+    }
+
+    pub fn edge_elements(&self) -> Vec<EdgeElement> {
+        self.edges.iter().map(|edge| edge.element.clone()).collect::<Vec<EdgeElement>>()
     }
 
     pub fn insert_edge(&mut self, edge: EdgeElement, node: &Rc<RefCell<Node<NodeElement, EdgeElement>>>) {
@@ -31,7 +36,7 @@ pub struct Edge<NodeElement, EdgeElement> {
     destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
 }
 
-impl<NodeElement, EdgeElement: PartialEq> Edge<NodeElement, EdgeElement> {
+impl<NodeElement, EdgeElement: PartialEq + Clone> Edge<NodeElement, EdgeElement> {
     pub fn new(element: EdgeElement, destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>) -> Self {
         Edge {
             destination_node: destination_node.clone(),
@@ -49,7 +54,7 @@ pub struct Graph<NodeElement, EdgeElement> {
     current_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
 }
 
-impl<NodeElement, EdgeElement: PartialEq> Graph<NodeElement, EdgeElement> {
+impl<NodeElement, EdgeElement: PartialEq + Clone> Graph<NodeElement, EdgeElement> {
     pub fn new(root_node: Node<NodeElement, EdgeElement>) -> Self {
         let root_node_ptr = Rc::new(RefCell::new(root_node));
         Graph {

@@ -39,7 +39,7 @@ fn print_current_location(graph: &StringGraph) {
     // https://www.reddit.com/r/rust/comments/6q4uqc/help_whats_the_best_way_to_join_an_iterator_of/
     let current_node = &graph.current_node();
     let location = current_node.borrow();
-    let possible_directions = location.edges.iter().map(|edge| edge.element.as_str().clone()).collect::<Vec<&str>>().join(", ");
+    let possible_directions = location.edge_elements().join(", ");
     println!(r#"
 Current Location:
     Description: {}
@@ -81,7 +81,7 @@ fn connect_new_location(graph: &mut StringGraph) {
         match prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str() {
             "y" | "Y" => {
                 let return_direction = prompt("Enter the return direction that will take you back:");
-                current_node.borrow_mut().insert_edge(return_direction, &current_node);
+                graph.current_node().borrow_mut().insert_edge(return_direction, &current_node);
                 break;
             }
             "n" | "N" => break,
@@ -93,7 +93,7 @@ fn connect_new_location(graph: &mut StringGraph) {
 fn move_to_location(graph: &mut StringGraph) -> bool {
     loop {
         let desired_direction = prompt("Which way do you want to go? ");
-        if desired_direction == "X".to_string() {
+x        if desired_direction == "X".to_string() {
             return false;
         }
 
