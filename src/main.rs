@@ -96,9 +96,9 @@ impl<NodeElement, EdgeElement: PartialEq> Graph<NodeElement, EdgeElement> {
 
 fn prompt(prompt: &str) -> String {
     print!("{} ", prompt);
-    stdout().flush();
+    let _ = stdout().flush().expect("Failure flushing stdout");
     let mut input = String::new();
-    stdin().read_line(&mut input);
+    let _ = stdin().read_line(&mut input).expect("Failure getting STDIN.");
     return input.trim().to_string();
 }
 
@@ -149,32 +149,31 @@ fn update_location_description(graph: &mut StringGraph) {
 }
 
 fn connect_new_location(graph: &mut StringGraph) {
-    let mut new_location =
+    let new_location =
         Rc::new(RefCell::new(StringNode::new(prompt("Enter the description for the new location:"))));
     let new_direction = prompt("Enter the direction that will take you to the new location:");
     {
-        let mut current_node = &graph.current_node;
+        let current_node = &graph.current_node;
         let mut borrowed_node = current_node.borrow_mut();
-        let to_edge = StringEdge::new(new_direction, new_location.clone());
+        let to_edge = StringEdge::new(new_direction.clone(), new_location.clone());
         // TODO: Why doesn't insert_edge work here? It says a move is occurring, but I don't understand.
         // graph.current_node.borrow().insert_edge(StringEdge::new(new_direction, new_location));
         borrowed_node.edges.push(to_edge);
 
         loop {
-            match (prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str()) {
+            match prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str() {
                 "y" | "Y" => {
-                    let mut return_direction = prompt("Enter the return direction that will take you back:");
+                    let return_direction = prompt("Enter the return direction that will take you back:");
                     new_location.borrow_mut().edges.push(StringEdge::new(return_direction, current_node.clone()));
                     break;
                 }
-                "n" | "Y" => break,
+                "n" | "N" => break,
                 _ => (),
             }
         }
     }
 
-    // TODO: Change this to use Graph::traverse instead.
-    graph.current_node = new_location.clone();
+    graph.traverse(new_direction.clone());
 }
 
 fn move_to_location(graph: &mut StringGraph) -> bool {
