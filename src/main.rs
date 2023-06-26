@@ -11,7 +11,7 @@ const PROMPT: &str = ">";
 
 struct Node<NodeElement, EdgeElement> {
     element: NodeElement,
-    edges: Vec<Edge<NodeElement, EdgeElement>>
+    edges: Vec<Edge<NodeElement, EdgeElement>>,
 }
 
 impl<NodeElement, EdgeElement: PartialEq> Node<NodeElement, EdgeElement> {
@@ -22,13 +22,13 @@ impl<NodeElement, EdgeElement: PartialEq> Node<NodeElement, EdgeElement> {
         }
     }
 
-    pub fn insert_edge(mut self, edge: Edge<NodeElement, EdgeElement>) {
-        self.edges.push(edge);
+    pub fn insert_edge(&mut self, edge: EdgeElement, node: &Rc<RefCell<Node<NodeElement, EdgeElement>>>) {
+        self.edges.push(Edge::new(edge, node.clone()));
     }
 
     pub fn node_for_edge_element(&self, element: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {
         self.edges.iter()
-            .find(|item| item.element == element)
+            .find(|item| item.matches(&element))
             .map(|item| item.destination_node.clone())
     }
 }
@@ -47,8 +47,8 @@ impl<NodeElement, EdgeElement: PartialEq> Edge<NodeElement, EdgeElement> {
         }
     }
 
-    pub fn matches(self, element: EdgeElement) -> bool {
-        self.element == element
+    pub fn matches(&self, element: &EdgeElement) -> bool {
+        self.element == *element
     }
 }
 
@@ -58,13 +58,24 @@ struct Graph<NodeElement, EdgeElement> {
 }
 
 impl<NodeElement, EdgeElement: PartialEq> Graph<NodeElement, EdgeElement> {
-
     pub fn new(root_node: Node<NodeElement, EdgeElement>) -> Self {
         let root_node_ptr = Rc::new(RefCell::new(root_node));
         Graph {
             root_node: root_node_ptr.clone(),
             current_node: root_node_ptr.clone(),
         }
+    }
+
+    pub fn root_node(&self) -> Rc<RefCell<Node<NodeElement, EdgeElement>>> {
+        self.root_node.clone()
+    }
+
+    pub fn current_node(&self) -> Rc<RefCell<Node<NodeElement, EdgeElement>>> {
+        self.current_node.clone()
+    }
+
+    pub fn insert_edge(&mut self, edge: EdgeElement, node: &Rc<RefCell<Node<NodeElement, EdgeElement>>>) {
+        self.current_node.borrow_mut().insert_edge(edge, node);
     }
 
     pub fn traverse(&mut self, edge: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {
@@ -77,20 +88,20 @@ impl<NodeElement, EdgeElement: PartialEq> Graph<NodeElement, EdgeElement> {
             match current_node.node_for_edge_element(edge) {
                 Some(matched_node) => {
                     Some(matched_node.clone())
-                },
+                }
                 None => None
             }
         } {
             Some(matched_node) => {
                 self.current_node = matched_node.clone();
                 Some(matched_node.clone())
-            },
+            }
             None => None
         }
     }
 
-    pub fn reset(mut self) {
-        self.root_node = self.current_node;
+    pub fn reset(&mut self) {
+        self.current_node = self.root_node().clone();
     }
 }
 
@@ -113,7 +124,6 @@ fn prompt_with_options(prompt_text: &str, options: Vec<&str>) -> String {
 }
 
 type StringNode = Node<String, String>;
-type StringEdge = Edge<String, String>;
 type StringGraph = Graph<String, String>;
 
 fn print_current_location(graph: &StringGraph) {
@@ -135,8 +145,9 @@ fn location_edit_menu(graph: &StringGraph) -> String {
 2. Connect new location.
 3. Move
 4. Enter interactive mode
+5. Reset to root node.
 x. Exit"#);
-    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "x"]);
+    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "5", "x"]);
 }
 
 fn update_location_description(graph: &mut StringGraph) {
@@ -152,28 +163,22 @@ fn connect_new_location(graph: &mut StringGraph) {
     let new_location =
         Rc::new(RefCell::new(StringNode::new(prompt("Enter the description for the new location:"))));
     let new_direction = prompt("Enter the direction that will take you to the new location:");
-    {
-        let current_node = &graph.current_node;
-        let mut borrowed_node = current_node.borrow_mut();
-        let to_edge = StringEdge::new(new_direction.clone(), new_location.clone());
-        // TODO: Why doesn't insert_edge work here? It says a move is occurring, but I don't understand.
-        // graph.current_node.borrow().insert_edge(StringEdge::new(new_direction, new_location));
-        borrowed_node.edges.push(to_edge);
-
-        loop {
-            match prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str() {
-                "y" | "Y" => {
-                    let return_direction = prompt("Enter the return direction that will take you back:");
-                    new_location.borrow_mut().edges.push(StringEdge::new(return_direction, current_node.clone()));
-                    break;
-                }
-                "n" | "N" => break,
-                _ => (),
+    graph.insert_edge(new_direction.clone(), &new_location);
+    // Capture the current_node before traversal just in case the user wants a reverse edge created
+    // as well.
+    let current_node = graph.current_node();
+    graph.traverse(new_direction);
+    loop {
+        match prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str() {
+            "y" | "Y" => {
+                let return_direction = prompt("Enter the return direction that will take you back:");
+                current_node.borrow_mut().insert_edge(return_direction, &current_node);
+                break;
             }
+            "n" | "N" => break,
+            _ => (),
         }
     }
-
-    graph.traverse(new_direction.clone());
 }
 
 fn move_to_location(graph: &mut StringGraph) -> bool {
@@ -217,8 +222,9 @@ fn main() {
             "3" => {
                 move_to_location(&mut graph);
                 ()
-            },
+            }
             "4" => interactive_mode(&mut graph),
+            "5" => graph.reset(),
             "X" | "x" => break,
             _ => ()
         }
