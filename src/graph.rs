@@ -55,8 +55,8 @@ pub struct Graph<NodeElement, EdgeElement> {
 }
 
 impl<NodeElement, EdgeElement: PartialEq + Clone> Graph<NodeElement, EdgeElement> {
-    pub fn new(root_node: Node<NodeElement, EdgeElement>) -> Self {
-        let root_node_ptr = Rc::new(RefCell::new(root_node));
+    pub fn new(root_node_element: NodeElement) -> Self {
+        let root_node_ptr = Rc::new(RefCell::new(Node::new(root_node_element)));
         Graph {
             root_node: root_node_ptr.clone(),
             current_node: root_node_ptr.clone(),
@@ -71,8 +71,10 @@ impl<NodeElement, EdgeElement: PartialEq + Clone> Graph<NodeElement, EdgeElement
         self.current_node.clone()
     }
 
-    pub fn insert_edge(&mut self, edge: EdgeElement, node: &Rc<RefCell<Node<NodeElement, EdgeElement>>>) {
-        self.current_node.borrow_mut().insert_edge(edge, node);
+    pub fn insert_edge(&mut self, edge: EdgeElement, node: NodeElement) {
+        let new_node =
+            Rc::new(RefCell::new(Node::new(node)));
+        self.current_node.borrow_mut().insert_edge(edge, &new_node);
     }
 
     pub fn traverse(&mut self, edge: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {

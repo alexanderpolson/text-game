@@ -3,11 +3,9 @@
  */
 
 
-use std::cell::RefCell;
 use std::io::{stdin, stdout, Write};
-use std::rc::Rc;
 
-use crate::graph::{Graph, Node};
+use crate::graph::Graph;
 
 mod graph;
 
@@ -31,7 +29,6 @@ fn prompt_with_options(prompt_text: &str, options: Vec<&str>) -> String {
     }
 }
 
-type StringNode = Node<String, String>;
 type StringGraph = Graph<String, String>;
 
 fn print_current_location(graph: &StringGraph) {
@@ -69,10 +66,8 @@ fn update_location_description(graph: &mut StringGraph) {
 }
 
 fn connect_new_location(graph: &mut StringGraph) {
-    let new_location =
-        Rc::new(RefCell::new(StringNode::new(prompt("Enter the description for the new location:"))));
     let new_direction = prompt("Enter the direction that will take you to the new location:");
-    graph.insert_edge(new_direction.clone(), &new_location);
+    graph.insert_edge(new_direction.clone(), prompt("Enter the description for the new location:"));
     // Capture the current_node before traversal just in case the user wants a reverse edge created
     // as well.
     let current_node = graph.current_node();
@@ -93,7 +88,7 @@ fn connect_new_location(graph: &mut StringGraph) {
 fn move_to_location(graph: &mut StringGraph) -> bool {
     loop {
         let desired_direction = prompt("Which way do you want to go? ");
-x        if desired_direction == "X".to_string() {
+        if desired_direction == "X".to_string() {
             return false;
         }
 
@@ -118,7 +113,7 @@ fn interactive_mode(graph: &mut StringGraph) {
 }
 
 fn main() {
-    let mut graph = StringGraph::new(StringNode::new(prompt("Enter the description of your first node:")));
+    let mut graph = StringGraph::new(prompt("Enter the description of your first node:"));
 
     // TODO: Add default data.
 
