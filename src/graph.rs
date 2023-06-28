@@ -32,7 +32,7 @@ impl<NodeElement, EdgeElement: PartialEq + Clone> Node<NodeElement, EdgeElement>
 
 /// Represents an edge between nodes in a single direction.
 pub struct Edge<NodeElement, EdgeElement> {
-    pub element: EdgeElement,
+    element: EdgeElement,
     destination_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
 }
 
@@ -50,21 +50,22 @@ impl<NodeElement, EdgeElement: PartialEq + Clone> Edge<NodeElement, EdgeElement>
 }
 
 pub struct Graph<NodeElement, EdgeElement> {
-    root_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
     current_node: Rc<RefCell<Node<NodeElement, EdgeElement>>>,
+    nodes: Vec<Rc<RefCell<Node<NodeElement, EdgeElement>>>>,
 }
 
 impl<NodeElement, EdgeElement: PartialEq + Clone> Graph<NodeElement, EdgeElement> {
     pub fn new(root_node_element: NodeElement) -> Self {
         let root_node_ptr = Rc::new(RefCell::new(Node::new(root_node_element)));
+        let nodes = vec![root_node_ptr.clone()];
         Graph {
-            root_node: root_node_ptr.clone(),
             current_node: root_node_ptr.clone(),
+            nodes,
         }
     }
 
     pub fn root_node(&self) -> Rc<RefCell<Node<NodeElement, EdgeElement>>> {
-        self.root_node.clone()
+        self.nodes[0].clone()
     }
 
     pub fn current_node(&self) -> Rc<RefCell<Node<NodeElement, EdgeElement>>> {
@@ -75,6 +76,7 @@ impl<NodeElement, EdgeElement: PartialEq + Clone> Graph<NodeElement, EdgeElement
         let new_node =
             Rc::new(RefCell::new(Node::new(node)));
         self.current_node.borrow_mut().insert_edge(edge, &new_node);
+        self.nodes.push(new_node);
     }
 
     pub fn traverse(&mut self, edge: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {
