@@ -68,15 +68,14 @@ fn update_location_description(graph: &mut StringGraph) {
 fn connect_new_location(graph: &mut StringGraph) {
     let new_direction = prompt("Enter the direction that will take you to the new location:");
     graph.insert_edge(new_direction.clone(), prompt("Enter the description for the new location:"));
-    // Capture the current_node before traversal just in case the user wants a reverse edge created
-    // as well.
-    let current_node = graph.current_node();
+    let original_node = graph.current_node();
     graph.traverse(new_direction);
     loop {
         match prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str() {
             "y" | "Y" => {
                 let return_direction = prompt("Enter the return direction that will take you back:");
-                graph.current_node().borrow_mut().insert_edge(return_direction, &current_node);
+                let original_node_borrowed = original_node.borrow();
+                graph.current_node().borrow_mut().insert_edge(return_direction, original_node_borrowed.id.clone());
                 break;
             }
             "n" | "N" => break,
