@@ -3,7 +3,10 @@
  */
 
 
+use std::collections::HashMap;
 use std::io::{stdin, stdout, Write};
+
+use uuid::Uuid;
 
 use crate::graph::Graph;
 
@@ -48,7 +51,7 @@ fn location_edit_menu(graph: &StringGraph) -> String {
     print_current_location(graph);
     println!(r#"
 1. Update description.
-2. Connect new location.
+2. Connect location.
 3. Move
 4. Enter interactive mode
 5. Reset to root node.
@@ -65,10 +68,25 @@ fn update_location_description(graph: &mut StringGraph) {
     }
 }
 
-fn connect_new_location(graph: &mut StringGraph) {
+fn connect_location(graph: &mut StringGraph) {
     let new_direction = prompt("Enter the direction that will take you to the new location:");
-    graph.insert_edge(new_direction.clone(), prompt("Enter the description for the new location:"));
+
+    // TODO: New or existing location?
+    loop {
+        match prompt_with_options("Create a new location or use an existing location?", vec!["N", "n", "E", "e"]).as_str() {
+            "n" | "N" => {
+                graph.insert_edge_to_new_node(new_direction.clone(), prompt("Enter the description for the new location:"));
+                break;
+            }
+            "e" | "E" => {
+                graph.insert_edge_to_existing_node(new_direction.clone(), select_node(graph));
+                break;
+            }
+            _ => (),
+        }
+    }
     let original_node = graph.current_node();
+
     graph.traverse(new_direction);
     loop {
         match prompt_with_options("Do you want to be able to get back to the original location (Y/N)?", vec!["y", "Y", "n", "N"]).as_str() {
@@ -84,10 +102,35 @@ fn connect_new_location(graph: &mut StringGraph) {
     }
 }
 
+fn select_node(graph: &StringGraph) -> Uuid {
+    let mut idx: u32 = 0;
+    let mut node_id_index: HashMap<u32, Uuid> = HashMap::new();
+    for node in graph.nodes() {
+        idx += 1;
+        let borrowed_node = node.borrow();
+        node_id_index.insert(idx, borrowed_node.id);
+        println!("{}. {}", idx, borrowed_node.element);
+    }
+
+    loop {
+        // TODO: Handle cancel option.
+        match prompt("Enter the location number:").parse::<u32>() {
+            Ok(selected_idx) => {
+                match node_id_index.get(&selected_idx) {
+                    Some(node_id) => return node_id.clone(),
+                    None => (),
+                }
+            }
+            Err(_) => ()
+        }
+        println!("Invalid input. Give it another go...")
+    }
+}
+
 fn move_to_location(graph: &mut StringGraph) -> bool {
     loop {
         let desired_direction = prompt("Which way do you want to go? ");
-        if desired_direction == "X".to_string() {
+        if desired_direction.to_uppercase() == "X".to_string() {
             return false;
         }
 
@@ -103,8 +146,6 @@ fn move_to_location(graph: &mut StringGraph) -> bool {
 fn interactive_mode(graph: &mut StringGraph) {
     loop {
         print_current_location(graph);
-        // TODO: Keep asking for a direction to go until a valid one is chosen.
-        // TODO: Encapsulate this into a function.
         if !move_to_location(graph) {
             break;
         }
@@ -119,9 +160,7 @@ fn main() {
     loop {
         match location_edit_menu(&graph).as_str() {
             "1" => update_location_description(&mut graph),
-            "2" => connect_new_location(&mut graph),
-            // TODO: Connect existing location
-            // Will need to navivate to it somehow, unless referring by some id?
+            "2" => connect_location(&mut graph),
             "3" => {
                 move_to_location(&mut graph);
                 ()

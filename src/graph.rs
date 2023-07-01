@@ -38,10 +38,12 @@ impl<NodeElement, EdgeElement: Eq + Hash + Clone> Node<NodeElement, EdgeElement>
     }
 }
 
+type NodeRef<NodeElement, EdgeElement> = Rc<RefCell<Node<NodeElement, EdgeElement>>>;
+
 pub struct Graph<NodeElement, EdgeElement: PartialEq + Clone> {
     root_node_id: Uuid,
     current_node_id: Uuid,
-    nodes: LinkedHashMap<Uuid, Rc<RefCell<Node<NodeElement, EdgeElement>>>>,
+    nodes: LinkedHashMap<Uuid, NodeRef<NodeElement, EdgeElement>>,
 }
 
 impl<NodeElement, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, EdgeElement> {
@@ -51,7 +53,7 @@ impl<NodeElement, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, EdgeElement
         let root_node_id = root_node.id.clone();
         nodes.insert(root_node_id.clone(), Rc::new(RefCell::new(root_node)));
         Graph {
-            root_node_id: root_node_id,
+            root_node_id,
             current_node_id: root_node_id,
             nodes,
         }
@@ -61,7 +63,7 @@ impl<NodeElement, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, EdgeElement
         self.nodes[&self.current_node_id].clone()
     }
 
-    pub fn insert_edge(&mut self, edge: EdgeElement, node: NodeElement) -> Uuid {
+    pub fn insert_edge_to_new_node(&mut self, edge: EdgeElement, node: NodeElement) -> Uuid {
         let new_node = Node::new(node);
         let new_node_id = new_node.id.clone();
         self.current_node().borrow_mut().insert_edge(edge, new_node_id.clone());
@@ -69,7 +71,16 @@ impl<NodeElement, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, EdgeElement
         new_node_id
     }
 
-    pub fn traverse(&mut self, edge_element: EdgeElement) -> Option<Rc<RefCell<Node<NodeElement, EdgeElement>>>> {
+    pub fn insert_edge_to_existing_node(&mut self, edge: EdgeElement, node_id: Uuid) {
+        self.current_node().borrow_mut().insert_edge(edge, node_id.clone());
+    }
+
+    pub fn nodes(&self) -> impl Iterator<Item=NodeRef<NodeElement, EdgeElement>> + '_ {
+        self.nodes.iter()
+            .map(|(_id, node_ref)| node_ref.clone())
+    }
+
+    pub fn traverse(&mut self, edge_element: EdgeElement) -> Option<NodeRef<NodeElement, EdgeElement>> {
         // The first block needs to borrow the current node to try and find a match. Once the block
         // goes out of scope, the borrow ends and the second block is responsible for assigning the
         // matched node as the current node. Without the separate blocks, the compiler complains
