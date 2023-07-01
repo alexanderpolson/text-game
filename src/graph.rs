@@ -39,7 +39,7 @@ impl<NodeElement, EdgeElement: Eq + Hash + Clone> Node<NodeElement, EdgeElement>
 }
 
 /// Represents an edge between nodes in a single direction.
-pub struct Edge<EdgeElement> {
+struct Edge<EdgeElement> {
     element: EdgeElement,
     destination_node_id: Uuid,
 }
@@ -50,10 +50,6 @@ impl<EdgeElement: PartialEq + Clone> Edge<EdgeElement> {
             destination_node_id,
             element,
         }
-    }
-
-    pub fn matches(&self, element: &EdgeElement) -> bool {
-        self.element == *element
     }
 }
 
