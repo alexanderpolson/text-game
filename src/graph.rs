@@ -9,7 +9,7 @@ use uuid::Uuid;
 pub struct Node<NodeElement, EdgeElement: PartialEq + Clone> {
     pub id: Uuid,
     pub element: NodeElement,
-    edges: HashMap<EdgeElement, Edge<EdgeElement>>,
+    edges: HashMap<EdgeElement, Uuid>,
 
 }
 
@@ -27,28 +27,13 @@ impl<NodeElement, EdgeElement: Eq + Hash + Clone> Node<NodeElement, EdgeElement>
     }
 
     pub fn insert_edge(&mut self, element: EdgeElement, node_id: Uuid) {
-        self.edges.insert(element.clone(), Edge::new(element, node_id));
+        self.edges.insert(element.clone(), node_id);
     }
 
     pub fn node_for_edge_element(&self, element: &EdgeElement) -> Option<Uuid> {
         match self.edges.get(&element) {
-            Some(edge) => Some(edge.destination_node_id),
+            Some(edge_node_id) => Some(edge_node_id.clone()),
             None => None
-        }
-    }
-}
-
-/// Represents an edge between nodes in a single direction.
-struct Edge<EdgeElement> {
-    element: EdgeElement,
-    destination_node_id: Uuid,
-}
-
-impl<EdgeElement: PartialEq + Clone> Edge<EdgeElement> {
-    pub fn new(element: EdgeElement, destination_node_id: Uuid) -> Self {
-        Edge {
-            destination_node_id,
-            element,
         }
     }
 }
