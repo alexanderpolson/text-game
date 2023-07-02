@@ -1,11 +1,14 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::Formatter;
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use std::rc::Rc;
 
 use linked_hash_map::LinkedHashMap;
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde_derive::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -121,5 +124,57 @@ impl<NodeElement: Eq + Hash + Clone + Serialize, EdgeElement: Eq + Hash + Clone 
             node_seq.serialize_element(borrowed_node.deref())?;
         }
         node_seq.end()
+    }
+}
+
+struct GraphVisitor<NodeElement: Eq + Hash + Clone + Serialize, EdgeElement: Eq + Hash + Clone + Serialize> {
+    marker: PhantomData<fn() -> Graph<NodeElement, EdgeElement>>,
+}
+
+impl<NodeElement: Eq + Hash + Clone + Serialize, EdgeElement: Eq + Hash + Clone + Serialize> GraphVisitor<NodeElement, EdgeElement> {
+    fn new() -> Self {
+        GraphVisitor {
+            marker: PhantomData
+        }
+    }
+}
+
+impl<'de, NodeElement: Eq + Hash + Clone + Serialize + Deserialize<'de>, EdgeElement: Eq + Hash + Clone + Serialize + Deserialize<'de>> Visitor<'de> for GraphVisitor<NodeElement, EdgeElement> {
+    type Value = Vec<Node<NodeElement, EdgeElement>>;
+
+    fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+        formatter.write_str("A Graph structure.")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+        let mut nodes: Vec<Node<NodeElement, EdgeElement>> = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+        while let Some(node) = seq.next_element::<Node<NodeElement, EdgeElement>>()? {
+            nodes.push(node);
+        }
+        Ok(nodes)
+    }
+}
+
+impl<'de, NodeElement: Eq + Hash + Clone + Serialize + Deserialize<'de>, EdgeElement: Eq + Hash + Clone + Serialize + Deserialize<'de>> Deserialize<'de> for Graph<NodeElement, EdgeElement> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        match deserializer.deserialize_seq(GraphVisitor::new()) {
+            Ok(nodes) => {
+                // TODO: Return an error if there aren't any nodes
+                let root_node_id = {
+                    let root_node = &nodes[0];
+                    root_node.id.clone()
+                };
+                let mut nodes_map: LinkedHashMap<String, NodeRef<NodeElement, EdgeElement>> = LinkedHashMap::with_capacity(nodes.len());
+                for node in nodes {
+                    nodes_map.insert(node.id.clone(), Rc::new(RefCell::new(node)));
+                }
+                Ok(Graph {
+                    current_node_id: root_node_id.clone(),
+                    root_node_id: root_node_id.clone(),
+                    nodes: nodes_map,
+                })
+            }
+            Err(e) => Err(e),
+        }
     }
 }

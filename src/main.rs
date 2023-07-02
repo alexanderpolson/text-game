@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::fs::File;
 use std::io::{stdin, stdout, Write};
 
 use crate::graph::Graph;
@@ -55,9 +54,8 @@ fn location_edit_menu(graph: &StringGraph) -> String {
 3. Move
 4. Enter interactive mode
 5. Reset to root node.
-6. Save
 x. Exit"#);
-    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "5", "6", "x"]);
+    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "5", "x"]);
 }
 
 fn update_location_description(graph: &mut StringGraph) {
@@ -77,10 +75,12 @@ fn connect_location(graph: &mut StringGraph) {
         match prompt_with_options("Create a new location or use an existing location?", vec!["N", "n", "E", "e"]).as_str() {
             "n" | "N" => {
                 graph.insert_edge_to_new_node(new_direction.clone(), prompt("Enter the description for the new location:"));
+                save(graph);
                 break;
             }
             "e" | "E" => {
                 graph.insert_edge_to_existing_node(new_direction.clone(), select_node(graph));
+                save(graph);
                 break;
             }
             _ => (),
@@ -95,6 +95,7 @@ fn connect_location(graph: &mut StringGraph) {
                 let return_direction = prompt("Enter the return direction that will take you back:");
                 let original_node_borrowed = original_node.borrow();
                 graph.current_node().borrow_mut().insert_edge(return_direction, original_node_borrowed.id.clone());
+                save(graph);
                 break;
             }
             "n" | "N" => break,
@@ -156,7 +157,6 @@ fn interactive_mode(graph: &mut StringGraph) {
 fn save(graph: &StringGraph) {
     match serde_json::to_string(&graph) {
         Ok(data) => {
-            println!("{}", data);
             match fs::write("game.json", data.as_bytes()) {
                 Ok(_) => (),
                 Err(e) => println!("An error occurred: {:#?}", e)
@@ -167,9 +167,12 @@ fn save(graph: &StringGraph) {
 }
 
 fn main() {
-    let mut graph =
-        StringGraph::new(prompt("Enter the description of your first node:"));
+    // let mut graph =
+    //     StringGraph::new(prompt("Enter the description of your first node:"));
 
+    // TODO: Allow reading/writing specific files by adding an initial menu before the one below.
+    let graph_data = fs::read_to_string("game.json").expect("Issue reading in game data");
+    let mut graph: StringGraph = serde_json::from_str(graph_data.as_str()).expect("Issue deserializing game data.");
     loop {
         match location_edit_menu(&graph).as_str() {
             "1" => update_location_description(&mut graph),
@@ -180,7 +183,6 @@ fn main() {
             }
             "4" => interactive_mode(&mut graph),
             "5" => graph.reset(),
-            "6" => save(&graph),
             "X" | "x" => break,
             _ => ()
         }
