@@ -4,9 +4,9 @@
 
 
 use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
 use std::io::{stdin, stdout, Write};
-
-use uuid::Uuid;
 
 use crate::graph::Graph;
 
@@ -55,8 +55,9 @@ fn location_edit_menu(graph: &StringGraph) -> String {
 3. Move
 4. Enter interactive mode
 5. Reset to root node.
+6. Save
 x. Exit"#);
-    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "5", "x"]);
+    return prompt_with_options(PROMPT, vec!["1", "2", "3", "4", "5", "6", "x"]);
 }
 
 fn update_location_description(graph: &mut StringGraph) {
@@ -102,13 +103,13 @@ fn connect_location(graph: &mut StringGraph) {
     }
 }
 
-fn select_node(graph: &StringGraph) -> Uuid {
+fn select_node(graph: &StringGraph) -> String {
     let mut idx: u32 = 0;
-    let mut node_id_index: HashMap<u32, Uuid> = HashMap::new();
+    let mut node_id_index: HashMap<u32, String> = HashMap::new();
     for node in graph.nodes() {
         idx += 1;
         let borrowed_node = node.borrow();
-        node_id_index.insert(idx, borrowed_node.id);
+        node_id_index.insert(idx, borrowed_node.id.clone());
         println!("{}. {}", idx, borrowed_node.element);
     }
 
@@ -152,10 +153,22 @@ fn interactive_mode(graph: &mut StringGraph) {
     }
 }
 
-fn main() {
-    let mut graph = StringGraph::new(prompt("Enter the description of your first node:"));
+fn save(graph: &StringGraph) {
+    match serde_json::to_string(&graph) {
+        Ok(data) => {
+            println!("{}", data);
+            match fs::write("game.json", data.as_bytes()) {
+                Ok(_) => (),
+                Err(e) => println!("An error occurred: {:#?}", e)
+            }
+        }
+        Err(e) => println!("An error occurred while writing: {:#?}", e),
+    }
+}
 
-    // TODO: Add default data.
+fn main() {
+    let mut graph =
+        StringGraph::new(prompt("Enter the description of your first node:"));
 
     loop {
         match location_edit_menu(&graph).as_str() {
@@ -167,6 +180,7 @@ fn main() {
             }
             "4" => interactive_mode(&mut graph),
             "5" => graph.reset(),
+            "6" => save(&graph),
             "X" | "x" => break,
             _ => ()
         }
