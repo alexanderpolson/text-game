@@ -167,12 +167,11 @@ fn save(graph: &StringGraph) {
 }
 
 fn main() {
-    // let mut graph =
-    //     StringGraph::new(prompt("Enter the description of your first node:"));
-
     // TODO: Allow reading/writing specific files by adding an initial menu before the one below.
-    let graph_data = fs::read_to_string("game.json").expect("Issue reading in game data");
-    let mut graph: StringGraph = serde_json::from_str(graph_data.as_str()).expect("Issue deserializing game data.");
+    let mut graph: StringGraph = match fs::read_to_string("game.json") {
+        Ok(graph_data) => serde_json::from_str(graph_data.as_str()).expect("Issue deserializing game data."),
+        Err(_e) => StringGraph::new(prompt("Enter the description of your first node:")),
+    };
     loop {
         match location_edit_menu(&graph).as_str() {
             "1" => update_location_description(&mut graph),
