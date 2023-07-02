@@ -29,8 +29,9 @@ impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Node<NodeElement, E
         }
     }
 
-    pub fn edge_elements(&self) -> Vec<EdgeElement> {
-        self.edges.iter().map(|(element, _)| element.clone()).collect::<Vec<EdgeElement>>()
+    // Returns an Iterator over all of the edge elements for this Node.
+    pub fn edge_elements(&self) -> impl Iterator<Item=EdgeElement> + '_ {
+        self.edges.iter().map(|(element, _)| element.clone())
     }
 
     pub fn insert_edge(&mut self, element: EdgeElement, node_id: String) {
