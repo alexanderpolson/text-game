@@ -13,14 +13,19 @@ use serde::ser::SerializeSeq;
 use serde_derive::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Represents a node in a Graph along with "pointers" to all of its edges based on their ids.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Node<NodeElement: Serialize, EdgeElement: Hash + Eq + PartialEq + Clone> {
+    /// Uniquely identifies this node.
     pub id: String,
+    /// The data associated with this node.
     pub element: NodeElement,
+    /// Maps an edge to the id of the node that the edge points to.
     edges: HashMap<EdgeElement, String>,
 }
 
 impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Node<NodeElement, EdgeElement> {
+    /// Create a new Node based on the element type being stored in the node.
     pub fn new(element: NodeElement) -> Self {
         Node {
             id: Uuid::new_v4().to_string(),
@@ -34,10 +39,13 @@ impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Node<NodeElement, E
         self.edges.iter().map(|(element, _)| element.clone())
     }
 
+    /// Insert a new edge that leads to the Node for the provided id.
     pub fn insert_edge(&mut self, element: EdgeElement, node_id: String) {
         self.edges.insert(element.clone(), node_id);
     }
 
+    /// Find the id for the Node that is connected to this Node via the provided edge, if one
+    /// exists.
     pub fn node_for_edge_element(&self, element: &EdgeElement) -> Option<String> {
         match self.edges.get(&element) {
             Some(edge_node_id) => Some(edge_node_id.clone()),
@@ -46,12 +54,11 @@ impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Node<NodeElement, E
     }
 }
 
+/// Shortcut for the pointers that are used for Nodes throughout the implementation.
 type NodeRef<NodeElement, EdgeElement> = Rc<RefCell<Node<NodeElement, EdgeElement>>>;
 
-
-// TODO: Implement Serialize and Deserialize
-// https://stackoverflow.com/a/51284093/1060627
-
+/// A Graph structure that allows traversal from one node to another. As the Graph is traversed, any
+/// changes that are made, are typically made to the current node.
 pub struct Graph<NodeElement: Serialize, EdgeElement: Hash + Eq + PartialEq + Clone> {
     root_node_id: String,
     current_node_id: String,
@@ -71,10 +78,13 @@ impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, 
         }
     }
 
+    /// Get a reference to the node for the current position in the Graph.
     pub fn current_node(&self) -> Rc<RefCell<Node<NodeElement, EdgeElement>>> {
         self.nodes[&self.current_node_id].clone()
     }
 
+    /// Insert an edge from the current Node that leads to a brand new Node with the provided
+    /// element.
     pub fn insert_edge_to_new_node(&mut self, edge: EdgeElement, node: NodeElement) -> String {
         let new_node = Node::new(node);
         let new_node_id = new_node.id.clone();
@@ -83,15 +93,19 @@ impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, 
         new_node_id
     }
 
+    /// Insert an edge from the current Node to an existing node for the provided `node_id`.
     pub fn insert_edge_to_existing_node(&mut self, edge: EdgeElement, node_id: String) {
         self.current_node().borrow_mut().insert_edge(edge, node_id.clone());
     }
 
+    /// Returns an Iterator over all the Nodes in the Graph in insertion order.
     pub fn nodes(&self) -> impl Iterator<Item=NodeRef<NodeElement, EdgeElement>> + '_ {
         self.nodes.iter()
             .map(|(_id, node_ref)| node_ref.clone())
     }
 
+    /// Update the current node in the Graph to another Node based on the provided edge element that
+    /// leads to that Node.
     pub fn traverse(&mut self, edge_element: EdgeElement) -> Option<NodeRef<NodeElement, EdgeElement>> {
         // The first block needs to borrow the current node to try and find a match. Once the block
         // goes out of scope, the borrow ends and the second block is responsible for assigning the
@@ -110,11 +124,14 @@ impl<NodeElement: Serialize, EdgeElement: Eq + Hash + Clone> Graph<NodeElement, 
         }
     }
 
+    /// Update the position in the Graph to be the root Node.
     pub fn reset(&mut self) {
         self.current_node_id = self.root_node_id.clone();
     }
 }
 
+/// JSON serialization for Graph. Derived from
+/// [an example from StackOverflow](https://stackoverflow.com/a/51284093/1060627).
 impl<NodeElement: Eq + Hash + Clone + Serialize, EdgeElement: Eq + Hash + Clone + Serialize> Serialize for Graph<NodeElement, EdgeElement> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer {

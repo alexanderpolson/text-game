@@ -38,7 +38,8 @@ fn print_current_location(graph: &StringGraph) {
     // https://www.reddit.com/r/rust/comments/6q4uqc/help_whats_the_best_way_to_join_an_iterator_of/
     let current_node = &graph.current_node();
     let location = current_node.borrow();
-    let possible_directions = location.edge_elements().join(", ");
+    let possible_directions =
+        location.edge_elements().collect::<Vec<String>>().join(", ");
     println!(r#"
 Current Location:
     Description: {}
